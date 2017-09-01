@@ -5,7 +5,7 @@
 int main() {
 
     int ret;
-
+    logJob(SUCCESS);
     ret = mergeMain("real_010101");
 
     return ret;

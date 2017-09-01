@@ -52,7 +52,7 @@ static int openInputSource(stream *target, const char* source)
     }
     printf("stream : %d\n", target->inputFormatContext->nb_streams);
 
-    av_dump_format(target->inputFormatContext, 0, source, 0); // print input source info
+    //av_dump_format(target->inputFormatContext, 0, source, 0); // print input source info
 
     return target->inputFormatContext->nb_streams;
 }
@@ -73,7 +73,6 @@ static int initOutputSource(stream *target, const char *source, const char *vid)
 
     /* allocate outputSource */
     outputSource = createOutputSource(vid);
-    printf("created sufix : %s\n", sufix);
     strcat(outputSource, sufix);
     printf("output source : %s\n", outputSource);
 
@@ -144,7 +143,7 @@ int mergeSource(stream *target, const char *source[])
     int audio_count = 0;
 
     int file_count = sizeof(*source) / sizeof(source[0]);
-    printf("size : %d\n", file_count);
+    printf("source count : %d\n", file_count);
     for (int i = 0; i < file_count; i++) {
 
 
@@ -272,11 +271,8 @@ int mergeMain(const char *vid) {
             break;
         nonVideo++;
     }
-    printf("initOutputSource : %d\n", ret);
 
     ret = mergeSource(&target, source);
-
-    printf("mergeSource : %d\n", ret);
 
     fprintf(stderr, "mergeMain return : %d\n", ret );
     return ret;
