@@ -7,6 +7,8 @@
 
 #include "libavformat/avformat.h"
 
+#define __toString(x) #x
+
 enum responseCode {
     SUCCESS = 0,
     OPENERR = -2,
@@ -14,6 +16,7 @@ enum responseCode {
     READERR = -4,
     VSTREAM = -5,
     UNKNOWNERR = 20,
+    count = 6
 };
 
 typedef struct _STREAM{
@@ -39,6 +42,8 @@ char *createOutputSource(const char *);
  *
  * @retrun NONE
  * */
-void logJob(int responseCode);
+void logJob(const char *, int );
+
+int setInputSource(const char *, char [][96]);
 
 #endif //MERGE_IN_C_COMM_H

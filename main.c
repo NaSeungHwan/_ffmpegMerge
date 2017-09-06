@@ -4,10 +4,10 @@
 
 int main() {
 
-    int ret;
-    logJob(SUCCESS);
-    ret = mergeMain("real_010101");
+    int ret = 0;
+    //logJob("test_010101", SUCCESS);
 
+    ret = mergeMain("real_010102", "/Users/naver/Desktop/");
     return ret;
 }
 

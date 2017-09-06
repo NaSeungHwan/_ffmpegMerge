@@ -40,15 +40,13 @@ static int openInputSource(stream *target, const char* source)
     if ( (avformat_open_input(&target->inputFormatContext, source, NULL, NULL)) )
     {
         fprintf(stderr, "Could not open input source '%s'", source);
-        //return _destroyStream(target,OPENERR);
-        return OPENERR;
+        return -1;
     }
 
     if ( (avformat_find_stream_info(target->inputFormatContext, NULL) < 0) )
     {
         fprintf(stderr, "Failed to retrieve input source info");
-        //return _destroyStream(target,READERR);
-        return READERR;
+        return -1;
     }
     printf("stream : %d\n", target->inputFormatContext->nb_streams);
 
@@ -62,19 +60,18 @@ static int initOutputSource(stream *target, const char *source, const char *vid)
     char *sufix = "_test.mp4";
     char *outputSource;
 
-    /* get inputSource info
-     * if return < 2 on failure, return VSTREAM
-     * */
-    if ( (openInputSource(target, source) < 2) )
+    /* inputSource의 stream 수를 받는다.
+     * stream != 2 이면 -1 리턴하고
+     */
+    if ( (openInputSource(target, source) != 2) )
     {
         _destroyStream(target);
-        return VSTREAM;
+        return -1;
     }
 
     /* allocate outputSource */
     outputSource = createOutputSource(vid);
     strcat(outputSource, sufix);
-    printf("output source : %s\n", outputSource);
 
     avformat_alloc_output_context2(&target->outputFormatContext, NULL, NULL,
                                    outputSource);
@@ -89,7 +86,7 @@ static int initOutputSource(stream *target, const char *source, const char *vid)
         {
             fprintf(stderr, "Failed allocating output stream\n");
             _destroyStream(target);
-            return ALLOCERR;
+            return -1;
         }
         /*
          * avcodec_parameters_copy(outStream->codecpar, inStream->codecpar)
@@ -101,7 +98,7 @@ static int initOutputSource(stream *target, const char *source, const char *vid)
         {
             fprintf(stderr, "Failed to copy context from input to output stream codec context\n");
             _destroyStream(target);
-            return READERR;
+            return -1;
         }
 
         outStream->codecpar->codec_tag = 0;
@@ -116,7 +113,7 @@ static int initOutputSource(stream *target, const char *source, const char *vid)
         if ( (avio_open(&target->outputFormatContext->pb, outputSource, AVIO_FLAG_WRITE) < 0) )
         {
             fprintf(stderr, "Could not open output file '%s'", outputSource);
-            return OPENERR;
+            return -1;
         }
     }
 
@@ -124,16 +121,17 @@ static int initOutputSource(stream *target, const char *source, const char *vid)
     if ( (avformat_write_header(target->outputFormatContext, NULL) < 0) )
     {
         fprintf(stderr, "Error occurred when opening output file\n");
-        return OPENERR;
+        return -1;
     }
-    /** close input context using init outputSource **/
+    /* close input context using init outputSource */
     avformat_close_input(&target->inputFormatContext);
 
-    return SUCCESS;
+    return 0;
 }
 
-int mergeSource(stream *target, const char *source[])
+int mergeSource(stream *target, const char source[][96])
 {
+    static int ret;
     int64_t pts_offset = 0;
     int64_t dts_offset = 0;
 
@@ -142,30 +140,23 @@ int mergeSource(stream *target, const char *source[])
 
     int audio_count = 0;
 
-    int file_count = sizeof(*source) / sizeof(source[0]);
-    printf("source count : %d\n", file_count);
-    for (int i = 0; i < file_count; i++) {
-
-
-        if ( (avformat_open_input(&target->inputFormatContext, source[i], 0, 0) < 0) ) {
-            fprintf(stderr, "Could not open input file '%s'", source[i]);
+    for (int i = 0; *source[i] != NULL; i++) {
+        ret = openInputSource(target, source[i]);
+        if ( ret == -1 )
+        {
             _destroyStream(target);
-            return OPENERR;
-        }
-
-        if ( (avformat_find_stream_info(target->inputFormatContext, 0) < 0 ) ) {
-            fprintf(stderr, "Failed to retrieve input stream information");
-            _destroyStream(target);
-            return READERR;
+            return -1;
         }
 
         int64_t last_dts = 0;
         int64_t last_pts = 0;
 
         while (1) {
+            //fprintf(stderr, "while in\n");
             AVStream *in_stream, *out_stream;
 
-            if ( ( av_read_frame(target->inputFormatContext, &target->pkt) < 0) )
+            ret = av_read_frame(target->inputFormatContext, &target->pkt);
+            if ( ret < 0 )
                 break;
 
             if ( target->inputFormatContext->nb_streams == 2 ) {
@@ -215,7 +206,8 @@ int mergeSource(stream *target, const char *source[])
                 }
             }
 
-            if ( (av_interleaved_write_frame(target->outputFormatContext, &target->pkt) < 0) ) {
+            ret = av_interleaved_write_frame(target->outputFormatContext, &target->pkt);
+            if ( ret < 0 ) {
                 fprintf(stderr, "Error muxing packet\n");
                 break;
             }
@@ -227,8 +219,15 @@ int mergeSource(stream *target, const char *source[])
         avformat_close_input(&target->inputFormatContext);
 
     }
+    ret = avformat_write_header(target->outputFormatContext,NULL);
+    if(ret < 0)
+        return -1;
 
-    av_write_trailer(target->outputFormatContext);
+    ret = av_write_trailer(target->outputFormatContext);
+    if(ret)
+        return -1;
+
+    return ret;
 }
 
 static void _destroyStream(stream *target)
@@ -248,7 +247,7 @@ static void _destroyStream(stream *target)
 }
 
 /** main function **/
-int mergeMain(const char *vid) {
+int mergeMain(const char *vid, const char *path) {
 
     /* variable definition */
     int     ret=0;
@@ -256,9 +255,16 @@ int mergeMain(const char *vid) {
     int     nonVideo = 0;
 
     // input source 추후, 특정 path내의 미디어 파일을 모두 찾아 넣도록 할 예정
-    const char  *source[] = {"/Users/naver/Desktop/20170801_real_37493_JGAs7dKftM_M.mp4"};
+    //const char  *source[] = {"/Users/naver/Desktop/20170801_real_37493_JGAs7dKftM_M.mp4"};
+    char  source[10][96];
     stream      target; // merge 에 필요한 변수들이 있는 struct
 
+    ret = setInputSource(path, source);
+    if ( ret != 0 )
+        return -1;
+    for(i = 0; *source[i] != NULL; i++)
+        printf("main d_name : %s\n", source[i]);
+    i=0;
     /*
      * init source
      * outputSorce init용 source가 stream이 1개일시, 다음 소스로 init
@@ -267,12 +273,12 @@ int mergeMain(const char *vid) {
     while(1) {
         _initStream(&target);
         ret = initOutputSource(&target, source[i++], vid);
-        if( ret != VSTREAM )
+        if( ret != -1 )
             break;
         nonVideo++;
     }
 
-    ret = mergeSource(&target, source);
+    ret = mergeSource(&target, &source);
 
     fprintf(stderr, "mergeMain return : %d\n", ret );
     return ret;
