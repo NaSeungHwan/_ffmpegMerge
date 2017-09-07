@@ -32,7 +32,14 @@
 #ifndef MERGE_IN_C_FFMPFUNCTHION_H
 #define MERGE_IN_C_FFMPFUNCTHION_H
 
-#include "lib/comm.h"
+#include "libavformat/avformat.h"
+
+typedef struct _STREAM{
+    AVOutputFormat *outputFormat;
+    AVFormatContext *outputFormatContext, *inputFormatContext;
+    AVPacket pkt;
+    AVRational tb_base;
+}stream;
 
 
 static void _initStream(stream *);
@@ -51,6 +58,7 @@ static int openInputSource(stream *, const char *);
 static int initOutputSource(stream *, const char *, const char *);
 static int mergeSource(stream *, const char [][96]);
 static void _destroyStream(stream *);
-int mergeMain(const char *, const char *);
+int mergeMain(const char [][96], const char *);
 
+int testFunc();
 #endif //MERGE_IN_C_FFMPFUNCTHION_H

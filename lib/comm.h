@@ -7,33 +7,8 @@
 
 #include "libavformat/avformat.h"
 
-#define __toString(x) #x
-
-enum responseCode {
-    SUCCESS = 0,
-    OPENERR = -2,
-    ALLOCERR = -3,
-    READERR = -4,
-    VSTREAM = -5,
-    UNKNOWNERR = 20,
-    count = 6
-};
-
-typedef struct _STREAM{
-    AVOutputFormat *outputFormat;
-    AVFormatContext *outputFormatContext, *inputFormatContext;
-    AVPacket pkt;
-    AVRational tb_base;
-}stream;
 
 struct tm const *createTime(struct tm const *);
-
-/**
- * @param vid Request VID
- *
- * @return char* outputSource if return other on failure.
- */
-char *createOutputSource(const char *);
 
 /**
  * @param responseCode enum variable in comm.h
@@ -42,7 +17,7 @@ char *createOutputSource(const char *);
  *
  * @retrun NONE
  * */
-void logJob(const char *, int );
+void logJob(const char *, const char *);
 
 int setInputSource(const char *, char [][96]);
 

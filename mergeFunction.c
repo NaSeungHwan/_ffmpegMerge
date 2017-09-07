@@ -7,10 +7,11 @@
 #define __STDC_FORMAT_MACROS
 #define __STDC_CONSTANT_MACROS
 
-#include "libavformat/avformat.h"
-#include "libavutil/timestamp.h"
+#include "libavutil/timestamp.h" // log_packet
 #include "mergeFunction.h"
 
+
+#include "lib/comm.h" // for test
 /** init variable **/
 
 static void log_packet(const AVFormatContext *fmt_ctx, const AVPacket *pkt, const char *tag)
@@ -34,7 +35,6 @@ static void _initStream(stream *target)
     av_register_all();
 }
 
-
 static int openInputSource(stream *target, const char* source)
 {
     if ( (avformat_open_input(&target->inputFormatContext, source, NULL, NULL)) )
@@ -48,17 +48,14 @@ static int openInputSource(stream *target, const char* source)
         fprintf(stderr, "Failed to retrieve input source info");
         return -1;
     }
-    printf("stream : %d\n", target->inputFormatContext->nb_streams);
 
     //av_dump_format(target->inputFormatContext, 0, source, 0); // print input source info
 
     return target->inputFormatContext->nb_streams;
 }
 
-static int initOutputSource(stream *target, const char *source, const char *vid)
+static int initOutputSource(stream *target, const char *source, const char *outputSource)
 {
-    char *sufix = "_test.mp4";
-    char *outputSource;
 
     /* inputSource의 stream 수를 받는다.
      * stream != 2 이면 -1 리턴하고
@@ -69,9 +66,6 @@ static int initOutputSource(stream *target, const char *source, const char *vid)
         return -1;
     }
 
-    /* allocate outputSource */
-    outputSource = createOutputSource(vid);
-    strcat(outputSource, sufix);
 
     avformat_alloc_output_context2(&target->outputFormatContext, NULL, NULL,
                                    outputSource);
@@ -148,11 +142,12 @@ int mergeSource(stream *target, const char source[][96])
             return -1;
         }
 
+        printf("target source : %s\n\t- stream : %d\n", source[i], target->inputFormatContext->nb_streams);
+
         int64_t last_dts = 0;
         int64_t last_pts = 0;
 
         while (1) {
-            //fprintf(stderr, "while in\n");
             AVStream *in_stream, *out_stream;
 
             ret = av_read_frame(target->inputFormatContext, &target->pkt);
@@ -213,9 +208,7 @@ int mergeSource(stream *target, const char source[][96])
             }
             av_packet_unref(&target->pkt);
         }
-
         dts_offset += last_dts;
-
         avformat_close_input(&target->inputFormatContext);
 
     }
@@ -239,32 +232,17 @@ static void _destroyStream(stream *target)
             avio_close(target->outputFormatContext->pb);
         avformat_free_context(target->outputFormatContext);
     }
-/*
-    if ( ret < 0 && ret != AVERROR_EOF ) {
-        fprintf(stderr, "Error occurred: %s\n", av_err2str(ret));
-        exit(UNKNOWNERR);
-    }*/
 }
 
 /** main function **/
-int mergeMain(const char *vid, const char *path) {
+int mergeMain(const char source[][96], const char *outputSource) {
 
     /* variable definition */
     int     ret=0;
     int     i=0;
     int     nonVideo = 0;
 
-    // input source 추후, 특정 path내의 미디어 파일을 모두 찾아 넣도록 할 예정
-    //const char  *source[] = {"/Users/naver/Desktop/20170801_real_37493_JGAs7dKftM_M.mp4"};
-    char  source[10][96];
     stream      target; // merge 에 필요한 변수들이 있는 struct
-
-    ret = setInputSource(path, source);
-    if ( ret != 0 )
-        return -1;
-    for(i = 0; *source[i] != NULL; i++)
-        printf("main d_name : %s\n", source[i]);
-    i=0;
     /*
      * init source
      * outputSorce init용 source가 stream이 1개일시, 다음 소스로 init
@@ -272,14 +250,31 @@ int mergeMain(const char *vid, const char *path) {
 
     while(1) {
         _initStream(&target);
-        ret = initOutputSource(&target, source[i++], vid);
+        ret = initOutputSource(&target, source[i++], outputSource);
         if( ret != -1 )
             break;
         nonVideo++;
     }
 
-    ret = mergeSource(&target, &source);
+    ret = mergeSource(&target, source);
 
     fprintf(stderr, "mergeMain return : %d\n", ret );
+    return ret;
+}
+
+int testFunc()
+{
+    int ret = 10;
+    const char *path = "/Users/naver/Desktop/";
+    char *outputSource = "/Users/naver/Desktop/output/20170801_real_37493_JGAs7dKftM_M.mp4";
+
+    char  source[10][96];
+
+    ret = setInputSource(path, source);
+    if ( ret != 0 )
+        return -1;
+
+    ret = mergeMain(source, outputSource);
+
     return ret;
 }

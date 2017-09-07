@@ -1,15 +1,15 @@
-#include <stdio.h>
 #include "mergeFunction.h"
 
 
 int main() {
 
-    int ret = 0;
-    //logJob("test_010101", SUCCESS);
+    int ret;
 
-    ret = mergeMain("real_010102", "/Users/naver/Desktop/");
+    ret = testFunc();
+
     return ret;
 }
+
 
 /*
  *
